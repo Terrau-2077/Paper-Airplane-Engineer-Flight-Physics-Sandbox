@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>纸飞机工程师 - 飞行物理沙盒</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+        }
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        #ui-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        #ui-layer > * {
+            pointer-events: auto;
+        }
+        .panel {
+            background: rgba(20, 20, 40, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(100, 150, 255, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+        }
+        #control-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            width: 280px;
+        }
+        #control-panel h2 {
+            font-size: 16px;
+            margin-bottom: 12px;
+            color: #6cf;
+        }
+        .slider-group {
+            margin-bottom: 12px;
+            pointer-events: auto;
+        }
+        .slider-group label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            margin-bottom: 4px;
+            color: #aaa;
+        }
+        .slider-group input[type="range"] {
+            width: 100%;
+            height: 6px;
+            -webkit-appearance: none;
+            appearance: none;
+            background: #333;
+            border-radius: 3px;
+            outline: none;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+        .slider-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #6cf;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        .btn {
+            width: 100%;
+            padding: 10px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #ccc;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        #hud {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 220px;
+            display: none;
+        }
+        #hud h3 {
+            font-size: 14px;
+            color: #6cf;
+            margin-bottom: 8px;
+        }
+        .hud-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            padding: 4px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .hud-label {
+            color: #888;
+        }
+        .hud-value {
+            color: #fff;
+            font-family: 'Courier New', monospace;
+        }
+        #result-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+            min-width: 300px;
+        }
+        #result-overlay h2 {
+            font-size: 24px;
+            color: #6cf;
+            margin-bottom: 16px;
+        }
+        .result-stat {
+            font-size: 18px;
+            margin: 8px 0;
+        }
+        .result-stat .number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #f9a;
+        }
+        #presets {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .preset-btn {
+            flex: 1;
+            padding: 6px;
+            font-size: 12px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #ccc;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .preset-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        #title-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            pointer-events: none;
+        }
+        #title-bar h1 {
+            font-size: 14px;
+            color: rgba(255,255,255,0.5);
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="ui-layer">
+        <div id="control-panel" class="panel">
+            <h2>飞机设计</h2>
+            <div id="presets">
+                <button class="preset-btn" data-preset="default">默认</button>
+                <button class="preset-btn" data-preset="distance">远距离</button>
+                <button class="preset-btn" data-preset="duration">长滞空</button>
+            </div>
+            <div class="slider-group">
+                <label>
+                    <span>机翼面积</span>
+                    <span id="wingArea-val">0.03 m²</span>
+                </label>
+                <input type="range" id="wingArea" min="0.01" max="0.06" step="0.001" value="0.04">
+            </div>
+            <div class="slider-group">
+                <label>
+                    <span>重心位置</span>
+                    <span id="cgPosition-val">28%</span>
+                </label>
+                <input type="range" id="cgPosition" min="15" max="45" step="1" value="28">
+            </div>
+            <div class="slider-group">
+                <label>
+                    <span>后掠角</span>
+                    <span id="sweepAngle-val">8°</span>
+                </label>
+                <input type="range" id="sweepAngle" min="0" max="45" step="1" value="8">
+            </div>
+            <div class="slider-group">
+                <label>
+                    <span>上反角</span>
+                    <span id="dihedralAngle-val">6°</span>
+                </label>
+                <input type="range" id="dihedralAngle" min="0" max="20" step="1" value="6">
+            </div>
+            <div class="slider-group">
+                <label>
+                    <span>发射速度</span>
+                    <span id="launchSpeed-val">14 m/s</span>
+                </label>
+                <input type="range" id="launchSpeed" min="5" max="25" step="1" value="14">
+            </div>
+            <div class="slider-group">
+                <label>
+                    <span>发射仰角</span>
+                    <span id="launchAngle-val">12°</span>
+                </label>
+                <input type="range" id="launchAngle" min="-10" max="45" step="1" value="12">
+            </div>
+            <button id="launch-btn" class="btn btn-primary">发射</button>
+            <button id="reset-btn" class="btn btn-secondary">重置</button>
+        </div>
+        <div id="hud" class="panel">
+            <h3>飞行数据</h3>
+            <div class="hud-row">
+                <span class="hud-label">速度</span>
+                <span class="hud-value" id="hud-speed">0.0 m/s</span>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label">高度</span>
+                <span class="hud-value" id="hud-altitude">0.0 m</span>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label">距离</span>
+                <span class="hud-value" id="hud-distance">0.0 m</span>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label">攻角</span>
+                <span class="hud-value" id="hud-aoa">0.0°</span>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label">升阻比</span>
+                <span class="hud-value" id="hud-ld">0.0</span>
+            </div>
+            <div class="hud-row">
+                <span class="hud-label">滞空时间</span>
+                <span class="hud-value" id="hud-time">0.0 s</span>
+            </div>
+        </div>
+        <div id="result-overlay" class="panel">
+            <h2>飞行结束</h2>
+            <div class="result-stat">
+                <div class="number" id="result-distance">0</div>
+                <div>飞行距离 (m)</div>
+            </div>
+            <div class="result-stat">
+                <div class="number" id="result-time">0</div>
+                <div>滞空时间 (s)</div>
+            </div>
+            <button id="result-reset-btn" class="btn btn-primary" style="margin-top: 16px;">再飞一次</button>
+        </div>
+        <div id="title-bar">
+            <h1>纸飞机工程师 · 飞行物理沙盒</h1>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="src/main.js?v=2"></script>
+</body>
+</html>
